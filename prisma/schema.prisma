@@ -1,0 +1,251 @@
+// Delivered ROAS data model.
+// Postgres (Supabase). DATABASE_URL is the pooled connection used at runtime,
+// DIRECT_URL is the direct connection used by `prisma migrate deploy`.
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Shopify session storage (from the app template).
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// One row per installed store. Secrets are stored encrypted (AES-256-GCM, see app/lib/crypto.server.ts).
+model Shop {
+  id                 String    @id // shop domain, e.g. malhaa.myshopify.com
+  name               String?
+  primaryDomain      String?
+  currency           String    @default("PKR")
+  timezone           String    @default("Asia/Karachi")
+  installedAt        DateTime  @default(now())
+  uninstalledAt      DateTime?
+  plan               String    @default("pilot")
+
+  // Meta
+  metaAdAccountId    String? // digits only, without act_
+  metaTokenEnc       String? // optional per shop token; falls back to META_SYSTEM_USER_TOKEN
+  metaPixelId        String?
+  capiTokenEnc       String? // Conversions API access token for this pixel
+  capiTestCode       String? // Events Manager test event code; when set, events go to Test Events only
+  capiEnabled        Boolean   @default(false)
+  sendConfirmed      Boolean   @default(true)
+  sendDelivered      Boolean   @default(true)
+  sendReturned       Boolean   @default(true)
+  deliveredSource    String    @default("website") // website | system_generated
+
+  // Confirmation rules
+  confirmTags        String    @default("confirmed,order confirmed,whatsapp confirmed")
+  confirmOnBooking   Boolean   @default(true) // a parcel booked with a courier counts as confirmed
+
+  // Couriers
+  postexTokenEnc     String?
+  leopardsKeyEnc     String?
+  leopardsPassEnc    String?
+
+  // Pixel
+  webPixelId         String?
+
+  // Sync state
+  backfillDone       Boolean   @default(false)
+  backfillCursor     String?
+  backfillSince      DateTime?
+  lastOrderSyncAt    DateTime?
+  lastCourierSyncAt  DateTime?
+  lastMetaSyncAt     DateTime?
+  metaBackfillDone   Boolean   @default(false)
+  lastCapiRunAt      DateTime?
+  lastStatusRunAt    DateTime?
+
+  orders             Order[]
+  shipments          Shipment[]
+  adDaily            AdDaily[]
+  capiEvents         CapiEvent[]
+  checkoutSignals    CheckoutSignal[]
+  jobRuns            JobRun[]
+}
+
+// Shopify orders. No raw phone, email or name is stored: only SHA256 hashes, which is
+// exactly what the Conversions API needs.
+model Order {
+  id              String    @id @default(cuid())
+  shopId          String
+  shop            Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyId       String // numeric order id
+  name            String // e.g. #1042
+  orderNumber     Int?
+  createdAt       DateTime
+  updatedAt       DateTime  @updatedAt
+  total           Float
+  currency        String    @default("PKR")
+  isCod           Boolean   @default(true)
+  financialStatus String?
+  cancelledAt     DateTime?
+  tags            String[]
+  city            String? // normalized lower case city
+  cityLabel       String? // as typed by the customer
+  countryCode     String?   @default("pk")
+  itemCount       Int       @default(1)
+
+  phoneHash       String?
+  emailHash       String?
+  fnHash          String?
+  lnHash          String?
+  externalIdHash  String?
+
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmContent      String?
+  utmTerm         String?
+  landingPage     String?
+  fbclid          String?
+  fbp             String?
+  fbc             String?
+  userAgent       String?
+  clientIp        String?
+  sourceUrl       String?
+
+  trackingNumbers String[]
+  trackingCompany String?
+
+  // Derived
+  confirmedAt     DateTime?
+  status          String    @default("NOT_DISPATCHED") // DELIVERED | RETURNED | IN_TRANSIT | NOT_DISPATCHED | CANCELLED
+  statusAt        DateTime?
+  courier         String?
+
+  shipments       Shipment[]
+
+  @@unique([shopId, shopifyId])
+  @@index([shopId, createdAt])
+  @@index([shopId, name])
+  @@index([shopId, status])
+}
+
+// Parcels as the courier sees them. Matched to orders by order reference or tracking number.
+model Shipment {
+  id             String    @id @default(cuid())
+  shopId         String
+  shop           Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderId        String?
+  order          Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  courier        String // postex | leopards | tcs | trax | mnp | other
+  trackingNumber String
+  orderRef       String?
+  rawStatus      String?
+  status         String    @default("UNKNOWN") // BOOKED | IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | RETURN_IN_TRANSIT | RETURNED | CANCELLED | UNKNOWN
+  statusAt       DateTime?
+  codAmount      Float?
+  city           String?
+  settled        Boolean?
+  source         String    @default("api") // api | csv
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([shopId, courier, trackingNumber])
+  @@index([shopId, orderRef])
+  @@index([shopId, status])
+}
+
+// Meta insights, one row per ad per day.
+model AdDaily {
+  id            String   @id @default(cuid())
+  shopId        String
+  shop          Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  date          String // YYYY-MM-DD in the ad account time zone
+  campaignId    String
+  campaignName  String
+  adsetId       String?
+  adsetName     String?
+  adId          String
+  adName        String
+  spend         Float
+  purchases     Float
+  purchaseValue Float
+  updatedAt     DateTime @updatedAt
+
+  @@unique([shopId, date, adId])
+  @@index([shopId, date])
+}
+
+// Browser data captured by the web pixel at checkout completed.
+model CheckoutSignal {
+  id         String   @id @default(cuid())
+  shopId     String
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyId  String
+  fbp        String?
+  fbc        String?
+  userAgent  String?
+  pageUrl    String?
+  clientId   String?
+  receivedAt DateTime @default(now())
+
+  @@unique([shopId, shopifyId])
+}
+
+// Every Conversions API event, from queue to Meta's response.
+model CapiEvent {
+  id         String    @id @default(cuid())
+  shopId     String
+  shop       Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  orderId    String
+  orderName  String
+  eventName  String // ConfirmedOrder | DeliveredOrder | ReturnedOrder
+  eventId    String
+  eventTime  DateTime
+  value      Float?
+  status     String    @default("QUEUED") // QUEUED | SENT | FAILED | STALE
+  attempts   Int       @default(0)
+  source     String? // action_source used
+  sentAt     DateTime?
+  response   Json?
+  error      String?
+  createdAt  DateTime  @default(now())
+
+  @@unique([shopId, eventId])
+  @@index([shopId, status])
+  @@index([shopId, createdAt])
+}
+
+model JobRun {
+  id         String    @id @default(cuid())
+  shopId     String?
+  shop       Shop?     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  job        String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  ok         Boolean?
+  detail     String?
+
+  @@index([shopId, startedAt])
+}
+
+model JobLock {
+  name        String   @id
+  lockedUntil DateTime
+}

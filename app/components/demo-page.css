@@ -1,0 +1,88 @@
+/* Public pages (sample report, landing): page ground plus the dark palette. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --dr-bg: #0d131d;
+    --dr-surface: #141c28;
+    --dr-ink: #e8edf5;
+    --dr-muted: #a3aebf;
+    --dr-faint: #7c889b;
+    --dr-line: #243042;
+    --dr-line-strong: #33425a;
+    --dr-accent: #5b9bff;
+    --dr-accent-soft: #15284a;
+    --dr-meta: #9aa3b5;
+    --dr-good: #3fcf94;
+    --dr-good-soft: #10301f;
+    --dr-warn: #f0b049;
+    --dr-warn-soft: #36270d;
+    --dr-bad: #ff7a70;
+    --dr-bad-soft: #3b1714;
+    --dr-info: #9cb8e0;
+    --dr-info-soft: #18243a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --dr-bg: #0d131d;
+  --dr-surface: #141c28;
+  --dr-ink: #e8edf5;
+  --dr-muted: #a3aebf;
+  --dr-faint: #7c889b;
+  --dr-line: #243042;
+  --dr-line-strong: #33425a;
+  --dr-accent: #5b9bff;
+  --dr-accent-soft: #15284a;
+  --dr-meta: #9aa3b5;
+  --dr-good: #3fcf94;
+  --dr-good-soft: #10301f;
+  --dr-warn: #f0b049;
+  --dr-warn-soft: #36270d;
+  --dr-bad: #ff7a70;
+  --dr-bad-soft: #3b1714;
+  --dr-info: #9cb8e0;
+  --dr-info-soft: #18243a;
+  color-scheme: dark;
+}
+html,
+body {
+  background: var(--dr-bg);
+  color: var(--dr-ink);
+  margin: 0;
+}
+/* Paints the band above the sticky top bar on phones with a notch */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 30;
+  background: var(--dr-bg);
+}
+.dr-demo {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 18px;
+  font-family: var(--dr-font-body);
+}
+.dr-demo-banner {
+  font-size: 13px;
+  color: var(--dr-muted);
+  background: var(--dr-surface);
+  border: 1px solid var(--dr-line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.dr-demo-banner strong {
+  color: var(--dr-ink);
+}
+.dr-demo-foot {
+  font-family: var(--dr-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dr-faint);
+}

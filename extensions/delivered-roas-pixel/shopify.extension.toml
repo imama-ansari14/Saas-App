@@ -1,0 +1,32 @@
+# Captures the Meta browser ids (_fbp, _fbc), the user agent and the order id at checkout
+# completed, and posts them to the app so delivered and confirmed events match the shopper.
+type = "web_pixel_extension"
+name = "delivered-roas-pixel"
+runtime_context = "strict"
+
+[customer_privacy]
+analytics = true
+marketing = true
+preferences = false
+sale_of_data = "enabled"
+
+[settings]
+type = "object"
+
+[settings.fields.endpoint]
+name = "Endpoint"
+description = "Where checkout signals are posted. Set by the app."
+type = "single_line_text_field"
+validations = [{ name = "min", value = "8" }]
+
+[settings.fields.shop]
+name = "Shop"
+description = "The myshopify domain. Set by the app."
+type = "single_line_text_field"
+validations = [{ name = "min", value = "3" }]
+
+[settings.fields.key]
+name = "Key"
+description = "Shared key that proves the post came from this store's pixel. Set by the app."
+type = "single_line_text_field"
+validations = [{ name = "min", value = "8" }]
